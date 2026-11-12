@@ -1,0 +1,10 @@
+*
+!requirements.txt
+!har/
+!har/*.py
+!configs/
+!configs/*.json
+!tests/
+!tests/*.py
+!README.md
+!Dockerfile

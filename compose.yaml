@@ -1,0 +1,82 @@
+x-app: &app
+  image: har-coursework:local
+  build: .
+  environment:
+    MLFLOW_TRACKING_URI: http://mlflow:5000
+    CUBLAS_WORKSPACE_CONFIG: ':4096:8'
+  volumes:
+    - './Human Action Recognition:/workspace/Human Action Recognition:ro'
+    - ./data:/workspace/data
+    - ./outputs:/workspace/outputs
+    - torch-cache:/root/.cache/torch
+
+services:
+  mlflow:
+    image: har-coursework:local
+    build: .
+    command:
+      - mlflow
+      - server
+      - --host
+      - 0.0.0.0
+      - --port
+      - '5000'
+      - --backend-store-uri
+      - sqlite:////tracking/mlflow.db
+      - --serve-artifacts
+      - --artifacts-destination
+      - /tracking/artifacts
+      - --default-artifact-root
+      - mlflow-artifacts:/
+    ports:
+      - '127.0.0.1:5000:5000'
+    volumes:
+      - ./outputs/tracking:/tracking
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:5000/health', timeout=5)"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 20s
+
+  tools:
+    <<: *app
+    profiles: [tools]
+    entrypoint: [python]
+
+  train:
+    <<: *app
+    profiles: [training]
+    entrypoint: [python, -m, har.train]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+  evaluate:
+    <<: *app
+    profiles: [training]
+    entrypoint: [python, -m, har.evaluate]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+  api:
+    image: har-coursework:local
+    build: .
+    profiles: [serving]
+    command: [uvicorn, har.api:app, --host, 0.0.0.0, --port, '8000']
+    environment:
+      MODEL_PATH: /workspace/outputs/final/model.pt
+    ports:
+      - '127.0.0.1:8000:8000'
+    volumes:
+      - ./outputs/final:/workspace/outputs/final:ro
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)"]
+      interval: 10s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  torch-cache:

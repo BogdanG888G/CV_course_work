@@ -1,0 +1,13 @@
+.venv/
+.runtime/
+__pycache__/
+*.pyc
+Human Action Recognition/
+data/
+outputs/
+mlruns/
+mlartifacts/
+mlflow.db
+.env
+deliverables/
+.library_helpers/
